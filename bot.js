@@ -13,12 +13,11 @@ const fs = require('fs');
 const path = require('path');
 
 // .env fayldan sozlamalarni yuklash
-const envResult = dotenv.config();
-const envVars = envResult.parsed || {};
+dotenv.config();
 
-// Bot tokenini tekshirish
-const BOT_TOKEN = envVars.BOT_TOKEN || process.env.BOT_TOKEN;
-const ADMIN_CHAT_ID = envVars.ADMIN_CHAT_ID || process.env.ADMIN_CHAT_ID;
+// Bot tokenini va admin ID ni o'qish (Railway avtomatik tarzda process.env ga qo'shadi)
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
 
 if (!BOT_TOKEN || BOT_TOKEN === 'YOUR_BOT_TOKEN_HERE') {
     console.error('❌ BOT_TOKEN .env faylda kiritilmagan!');
