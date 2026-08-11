@@ -1,0 +1,20 @@
+{
+  "users": [
+    {
+      "id": 2060360205,
+      "username": "Jasur_Ulugbekovich17",
+      "joinedAt": "2026-08-11T11:35:37.437Z"
+    }
+  ],
+  "orders": [
+    {
+      "userId": 2060360205,
+      "username": "Jasur_Ulugbekovich17",
+      "name": "Jasur",
+      "phone": "+998901425142",
+      "service": "🤖 Telegram bot yasash",
+      "comment": "Yo'q",
+      "createdAt": "2026-08-11T11:37:54.645Z"
+    }
+  ]
+}

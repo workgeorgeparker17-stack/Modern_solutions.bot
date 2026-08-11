@@ -1,0 +1,8 @@
+# .env faylni git'ga yuklamaslik
+.env
+
+# Node modules
+node_modules/
+
+# Data fayl (agar maxfiy bo'lsa)
+# data.json
