@@ -74,7 +74,9 @@ function addUser(userId, username) {
             joinedAt: new Date().toISOString(),
         });
         saveData(data);
+        return true; // Yangi foydalanuvchi
     }
+    return false; // Eski foydalanuvchi
 }
 
 /**
@@ -236,6 +238,18 @@ const stage = new Scenes.Stage([orderWizard]);
 
 // Session va stage middleware'larni ulash
 bot.use(session());
+
+// Har qanday holatda "botni qayta ishga tushirish" uchun middleware
+// Agar user scene ichida turib /start yuborsa u holatdan chiqib ketishi u.
+bot.use((ctx, next) => {
+    if (ctx.message && ctx.message.text === '/start') {
+        if (ctx.scene && ctx.scene.current) {
+            ctx.scene.leave();
+        }
+    }
+    return next();
+});
+
 bot.use(stage.middleware());
 
 // ============================================
@@ -265,22 +279,30 @@ async function showMainMenu(ctx) {
 // ============================================
 
 bot.start(async (ctx) => {
-    // Foydalanuvchini ro'yxatga qo'shish
-    addUser(ctx.from.id, ctx.from.username);
-
+    // Foydalanuvchini ro'yxatga qo'shish va holatini tekshirish
+    const isNewUser = addUser(ctx.from.id, ctx.from.username);
     const firstName = ctx.from.first_name || 'do\'stim';
 
-    // Salomlashish xabari
-    await ctx.reply(
-        `🎉 *Assalomu alaykum, ${firstName}!*\n\n` +
-        '🏢 *Zamonaviy Yechimlar Bot*ga xush kelibsiz!\n\n' +
-        'Biz sizga quyidagi xizmatlarni taklif etamiz:\n' +
-        '🤖 Telegram bot yasash\n' +
-        '🌐 Veb-sayt yasash\n' +
-        '📱 SMM xizmati\n\n' +
-        'Quyidagi tugmalardan birini tanlab boshlang! 👇',
-        { parse_mode: 'Markdown' }
-    );
+    if (isNewUser) {
+        // Yangi user uchun to'liq salomlashish xabari
+        await ctx.reply(
+            `🎉 *Assalomu alaykum, ${firstName}!*\n\n` +
+            '🏢 *Zamonaviy Yechimlar Bot*ga xush kelibsiz!\n\n' +
+            'Biz sizga quyidagi xizmatlarni taklif etamiz:\n' +
+            '🤖 Telegram bot yasash\n' +
+            '🌐 Veb-sayt yasash\n' +
+            '📱 SMM xizmati\n\n' +
+            'Quyidagi tugmalardan birini tanlab boshlang! 👇',
+            { parse_mode: 'Markdown' }
+        );
+    } else {
+        // Eski user u. qisqacha xabar
+        await ctx.reply(
+            `👋 *Qaytganingiz bilan, ${firstName}!*\n\n` +
+            'Quyidagi menyudan kerakli bo\'limni tanlang 👇',
+            { parse_mode: 'Markdown' }
+        );
+    }
 
     // Asosiy menyuni ko'rsatish
     await showMainMenu(ctx);
@@ -545,6 +567,12 @@ bot.on('text', async (ctx) => {
 bot
     .launch()
     .then(() => {
+        // Telegram uchun Main Menu comandalari tugmachasini yaratish
+        bot.telegram.setMyCommands([
+            { command: 'start', description: 'Botni qayta ishga tushirish' },
+            { command: 'admin', description: 'Admin panel va Statistika' }
+        ]);
+
         console.log('✅ Bot muvaffaqiyatli ishga tushdi!');
         console.log(`🤖 Bot nomi: Sotuv Manager Bot`);
         console.log(`👤 Admin Chat ID: ${ADMIN_CHAT_ID}`);
