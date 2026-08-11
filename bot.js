@@ -120,23 +120,57 @@ const orderWizard = new Scenes.WizardScene(
 
     // 2-qadam: Ismni olish va telefon raqamini so'rash
     async (ctx) => {
-        // Foydalanuvchi text yuborganini tekshirish
-        if (!ctx.message || !ctx.message.text) {
-            await ctx.reply('❗ Iltimos, ismingizni text ko\'rinishida yuboring:');
+        if (ctx.message && ctx.message.text === '/start') {
+            await ctx.scene.leave();
+            return handleStart(ctx);
+        }
+
+        const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
+        if (!text || text.startsWith('/') || text.length < 2) {
+            await ctx.reply('❗ Iltimos, haqiqiy ismingizni so\'z bilan kiriting:');
             return;
         }
-        ctx.wizard.state.orderData.name = ctx.message.text;
-        await ctx.reply('📱 Telefon raqamingizni kiriting (masalan: +998901234567):');
+
+        ctx.wizard.state.orderData.name = text;
+        await ctx.reply(
+            '📱 Telefon raqamingizni kiriting yoki pastdagi tugmani bosing:',
+            Markup.keyboard([
+                [Markup.button.contactRequest('📱 Raqamni ulashish')]
+            ])
+                .oneTime()
+                .resize()
+        );
         return ctx.wizard.next();
     },
 
     // 3-qadam: Telefon raqamini olish va xizmatni so'rash
     async (ctx) => {
-        if (!ctx.message || !ctx.message.text) {
-            await ctx.reply('❗ Iltimos, telefon raqamingizni text ko\'rinishida yuboring:');
+        if (ctx.message && ctx.message.text === '/start') {
+            await ctx.scene.leave();
+            return handleStart(ctx);
+        }
+
+        let phoneNum = '';
+        if (ctx.message && ctx.message.contact) {
+            phoneNum = ctx.message.contact.phone_number;
+        } else if (ctx.message && ctx.message.text) {
+            const text = ctx.message.text.trim();
+            if (text.startsWith('/')) {
+                await ctx.reply('❗ Komanda kiritmang. Raqamingizni yozing yoki tugmani bosing:');
+                return;
+            }
+            phoneNum = text;
+        } else {
+            await ctx.reply('❗ Iltimos, "📱 Raqamni ulashish" tugmasini bosing yoki raqamingizni yozing:');
             return;
         }
-        ctx.wizard.state.orderData.phone = ctx.message.text;
+
+        ctx.wizard.state.orderData.phone = phoneNum;
+
+        // Remove the regular phone keyboard
+        await ctx.reply('Rahmat!', { reply_markup: { remove_keyboard: true } });
+
+        // Show inline menu for services
         await ctx.reply(
             '🛠 Qaysi xizmat kerak?\n\nQuyidagilardan birini tanlang:',
             Markup.inlineKeyboard([
@@ -150,39 +184,47 @@ const orderWizard = new Scenes.WizardScene(
 
     // 4-qadam: Xizmatni olish va qo'shimcha izoh so'rash
     async (ctx) => {
-        // Inline tugma bosilganini tekshirish
+        if (ctx.message && ctx.message.text === '/start') {
+            await ctx.scene.leave();
+            return handleStart(ctx);
+        }
+
         if (ctx.callbackQuery) {
             const serviceMap = {
                 service_bot: '🤖 Telegram bot yasash',
                 service_web: '🌐 Veb-sayt yasash',
                 service_smm: '📱 SMM xizmati',
             };
-            ctx.wizard.state.orderData.service =
-                serviceMap[ctx.callbackQuery.data] || ctx.callbackQuery.data;
+            ctx.wizard.state.orderData.service = serviceMap[ctx.callbackQuery.data] || ctx.callbackQuery.data;
             await ctx.answerCbQuery();
-            await ctx.reply(
-                '💬 Qo\'shimcha izoh bormi?\n\n(Agar yo\'q bo\'lsa, "Yo\'q" deb yozing)'
-            );
+            await ctx.reply('💬 Qo\'shimcha izoh bormi?\n\n(Agar yo\'q bo\'lsa, "Yo\'q" deb yozing)');
             return ctx.wizard.next();
         }
-        // Agar text yuborganda — xizmatni qo'lda kiritish
-        if (ctx.message && ctx.message.text) {
-            ctx.wizard.state.orderData.service = ctx.message.text;
-            await ctx.reply(
-                '💬 Qo\'shimcha izoh bormi?\n\n(Agar yo\'q bo\'lsa, "Yo\'q" deb yozing)'
-            );
-            return ctx.wizard.next();
+
+        const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
+        if (!text || text.startsWith('/') || text.length < 2) {
+            await ctx.reply('❗ Iltimos, xizmatni tugma orqali tanlang yoki nomini manoli yozing:');
+            return;
         }
-        await ctx.reply('❗ Iltimos, xizmatni tanlang yoki yozing.');
+
+        ctx.wizard.state.orderData.service = text;
+        await ctx.reply('💬 Qo\'shimcha izoh bormi?\n\n(Agar yo\'q bo\'lsa, "Yo\'q" deb yozing)');
+        return ctx.wizard.next();
     },
 
     // 5-qadam: Izohni olish va buyurtmani yakunlash
     async (ctx) => {
-        if (!ctx.message || !ctx.message.text) {
-            await ctx.reply('❗ Iltimos, izohni text ko\'rinishida yuboring:');
+        if (ctx.message && ctx.message.text === '/start') {
+            await ctx.scene.leave();
+            return handleStart(ctx);
+        }
+
+        const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
+        if (!text || text.startsWith('/')) {
+            await ctx.reply('❗ Iltimos, izohni to\'g\'ri matn ko\'rinishida yuboring (yoki "Yo\'q" deb yozing):');
             return;
         }
-        ctx.wizard.state.orderData.comment = ctx.message.text;
+        ctx.wizard.state.orderData.comment = text;
 
         const order = ctx.wizard.state.orderData;
         const userId = ctx.from.id;
@@ -238,18 +280,6 @@ const stage = new Scenes.Stage([orderWizard]);
 
 // Session va stage middleware'larni ulash
 bot.use(session());
-
-// Har qanday holatda "botni qayta ishga tushirish" uchun middleware
-// Agar user scene ichida turib /start yuborsa u holatdan chiqib ketishi u.
-bot.use((ctx, next) => {
-    if (ctx.message && ctx.message.text === '/start') {
-        if (ctx.scene && ctx.scene.current) {
-            ctx.scene.leave();
-        }
-    }
-    return next();
-});
-
 bot.use(stage.middleware());
 
 // ============================================
@@ -274,17 +304,14 @@ async function showMainMenu(ctx) {
     );
 }
 
-// ============================================
-// /start KOMANDASI
-// ============================================
-
-bot.start(async (ctx) => {
-    // Foydalanuvchini ro'yxatga qo'shish va holatini tekshirish
+/**
+ * Botni ishga tushiruvchi yordamchi funksiya (/start va reset u.) 
+ */
+async function handleStart(ctx) {
     const isNewUser = addUser(ctx.from.id, ctx.from.username);
     const firstName = ctx.from.first_name || 'do\'stim';
 
     if (isNewUser) {
-        // Yangi user uchun to'liq salomlashish xabari
         await ctx.reply(
             `🎉 *Assalomu alaykum, ${firstName}!*\n\n` +
             '🏢 *Zamonaviy Yechimlar Bot*ga xush kelibsiz!\n\n' +
@@ -296,16 +323,19 @@ bot.start(async (ctx) => {
             { parse_mode: 'Markdown' }
         );
     } else {
-        // Eski user u. qisqacha xabar
         await ctx.reply(
             `👋 *Qaytganingiz bilan, ${firstName}!*\n\n` +
             'Quyidagi menyudan kerakli bo\'limni tanlang 👇',
             { parse_mode: 'Markdown' }
         );
     }
-
-    // Asosiy menyuni ko'rsatish
     await showMainMenu(ctx);
+}
+
+bot.start(async (ctx) => {
+    // Agar scene da turib bosilsa, oldingidan clean qilish shart emas 
+    // chunki scene tashqarisida ishlaydi, baribir
+    await handleStart(ctx);
 });
 
 // ============================================
